@@ -8,8 +8,8 @@ const Datauri = require('datauri')
 const CryptoJS = require("crypto-js")
 const firestore = admin.firestore()
 const gmailEmail = 'kirananto@gmail.com';
-var bytes  = CryptoJS.AES.decrypt(ciphertext, 'password');
-var gmailPassword = bytes.toString(CryptoJS.enc.Utf8);
+//var bytes  = CryptoJS.AES.decrypt(ciphertext, 'password');
+var gmailPassword = 'abcd';
 const mailTransport = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -24,19 +24,19 @@ const mailOptions = {
 }
 exports.correctAnswer = functions.firestore
   .document('users/{userId}')
-  .onUpdate(event => {
+  .onUpdate((change, context) => {
 
-    var newValue = event.data.data()
+    var newValue = change.after.data()
     var newCurrentHash = newValue.currentHash
     var newPreviousHash = newValue.previousHash
-    var previousValue = event.data.previous.data()
+    var previousValue = change.before.data()
     var oldCurrentHash = previousValue.currentHash
     var oldPreviousHash = previousValue.previousHash
 
     if (newPreviousHash === oldCurrentHash) {
       var questionData = firestore.doc(`q/questions/${newCurrentHash}/${newPreviousHash}`).get()
       .then(doc => {
-        return firestore.doc(`leaderboard/${event.data.id}`).set({
+        return firestore.doc(`leaderboard/${context.params.userId}`).set({
           college: newValue.college,
           currentLevel: doc.data().level,
           displayName: newValue.displayName,
@@ -48,10 +48,10 @@ exports.correctAnswer = functions.firestore
        })
     } else {
       // He is a hacker.. delete and ban his account
-      var hacker = firestore.doc(`hackers/${event.data.id}`).set(event.data.data()).then(doc => {
+      var hacker = firestore.doc(`hackers/${context.params.userId}`).set(change.after.data()).then(doc => {
           var batch = firestore.batch()
-          batch.delete(firestore.doc(`leaderboard/${event.data.id}`))
-          batch.delete(firestore.doc(`users/${event.data.id}`))
+          batch.delete(firestore.doc(`leaderboard/${change.after.id}`))
+          batch.delete(firestore.doc(`users/${change.after.id}`))
           return batch.commit().then(success => {
             console.log('Hacker Found')
           })
